@@ -260,7 +260,7 @@ def duration(filename):
         return float(result.stdout)
     except ValueError:
         raise ValueError(f"Could not retrieve duration for the file: {filename}")
-
+        return 1
     
 def exec(cmd):
     process = subprocess.run(cmd, stdout=subprocess.PIPE,stderr=subprocess.PIPE)
