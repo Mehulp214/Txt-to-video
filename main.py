@@ -222,29 +222,14 @@ import asyncio
 import aiohttp
 import os
 import time
-import re
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
-from pyrogram.errors import FloodWait
-from subprocess import getstatusoutput
-from p_bar import progress_bar
-import helper
-from logger import logging
+from pyrogram.types import Message
+from helper import download_video, send_vid, send_doc, download_file
 
 bot = Client("bot",
              bot_token="7424760524:AAG-0er3b470bzc6je84PHUiNB4d45rvy4M",
              api_id=20778821,
              api_hash="70ddbf0162bafe8b7e0007c3b22d01c0")
-
-
-async def download_file(session, url, file_path):
-    async with session.get(url) as response:
-        with open(file_path, 'wb') as f:
-            while True:
-                chunk = await response.content.read(1024)
-                if not chunk:
-                    break
-                f.write(chunk)
 
 
 @bot.on_message(filters.command(["start"]))
@@ -261,92 +246,95 @@ async def stop_handler(_, m: Message):
 @bot.on_message(filters.command(["vastavik"]))
 async def vastavik_handler(bot: Client, m: Message):
     editable = await m.reply_text('Send TXT file for download')
-    input_message: Message = await bot.listen(editable.chat.id)
-    file_path = await input_message.download()
-    await input_message.delete(True)
+    
+    @bot.on_message(filters.document)
+    async def file_handler(bot: Client, input_message: Message):
+        file_path = await input_message.download()
+        await input_message.delete(True)
 
-    try:
-        with open(file_path, "r") as f:
-            content = f.read().strip().split("\n")
-        os.remove(file_path)
-    except Exception as e:
-        await m.reply_text(f"Invalid file input: {e}")
-        return
+        try:
+            with open(file_path, "r") as f:
+                content = f.read().strip().split("\n")
+            os.remove(file_path)
+        except Exception as e:
+            await m.reply_text(f"Invalid file input: {e}")
+            return
 
-    await editable.edit(f"Total links found are **{len(content)}**\n\nSend From where you want to download initial is **1**")
-    start_message: Message = await bot.listen(editable.chat.id)
-    start_index = int(start_message.text.strip()) - 1
-    await start_message.delete(True)
+        await editable.edit(f"Total links found are **{len(content)}**\n\nSend From where you want to download initial is **1**")
+        start_message = await bot.listen(editable.chat.id)
+        start_index = int(start_message.text.strip()) - 1
+        await start_message.delete(True)
 
-    await editable.edit("**Enter Batch Name**")
-    batch_message: Message = await bot.listen(editable.chat.id)
-    batch_name = batch_message.text.strip()
-    await batch_message.delete(True)
+        await editable.edit("**Enter Batch Name**")
+        batch_message = await bot.listen(editable.chat.id)
+        batch_name = batch_message.text.strip()
+        await batch_message.delete(True)
 
-    await editable.edit("**Enter resolution**")
-    resolution_message: Message = await bot.listen(editable.chat.id)
-    resolution = resolution_message.text.strip()
-    await resolution_message.delete(True)
+        await editable.edit("**Enter resolution**")
+        resolution_message = await bot.listen(editable.chat.id)
+        resolution = resolution_message.text.strip()
+        await resolution_message.delete(True)
 
-    await editable.edit("**Enter A Highlighter Otherwise send 👉Co👈 **")
-    highlighter_message: Message = await bot.listen(editable.chat.id)
-    highlighter = highlighter_message.text.strip()
-    await highlighter_message.delete(True)
-    if highlighter == 'Co':
-        highlighter = "️ ⁪⁬⁮⁮⁮"
+        await editable.edit("**Enter A Highlighter Otherwise send 👉Co👈 **")
+        highlighter_message = await bot.listen(editable.chat.id)
+        highlighter = highlighter_message.text.strip()
+        await highlighter_message.delete(True)
+        if highlighter == 'Co':
+            highlighter = "️ ⁪⁬⁮⁮⁮"
 
-    await editable.edit("Now send the **Thumb url**\nEg : ```https://telegra.ph/file/0633f8b6a6f110d34f044.jpg```\n\nor Send `no`")
-    thumb_message: Message = await bot.listen(editable.chat.id)
-    thumb_url = thumb_message.text.strip()
-    await thumb_message.delete(True)
-    await editable.delete()
+        await editable.edit("Now send the **Thumb url**\nEg : ```https://telegra.ph/file/0633f8b6a6f110d34f044.jpg```\n\nor Send `no`")
+        thumb_message = await bot.listen(editable.chat.id)
+        thumb_url = thumb_message.text.strip()
+        await thumb_message.delete(True)
+        await editable.delete()
 
-    if thumb_url.startswith("http://") or thumb_url.startswith("https://"):
-        getstatusoutput(f"wget '{thumb_url}' -O 'thumb.jpg'")
-        thumb_path = "thumb.jpg"
-    else:
-        thumb_path = None
+        if thumb_url.startswith("http://") or thumb_url.startswith("https://"):
+            getstatusoutput(f"wget '{thumb_url}' -O 'thumb.jpg'")
+            thumb_path = "thumb.jpg"
+        else:
+            thumb_path = None
 
-    async with aiohttp.ClientSession() as session:
-        for index in range(start_index, len(content)):
-            link = content[index].split("://", 1)
-            if len(link) < 2:
-                continue
+        async with aiohttp.ClientSession() as session:
+            for index in range(start_index, len(content)):
+                link = content[index].split("://", 1)
+                if len(link) < 2:
+                    continue
 
-            url = "https://" + link[1].replace("file/d/", "uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing", "")
-            name = f"{str(index + 1).zfill(3)}) {link[0][:60].replace(':', '').replace('/', '').strip()}"
+                url = "https://" + link[1].replace("file/d/", "uc?export=download&id=").replace("www.youtube-nocookie.com/embed", "youtu.be").replace("?modestbranding=1", "").replace("/view?usp=sharing", "")
+                name = f"{str(index + 1).zfill(3)}) {link[0][:60].replace(':', '').replace('/', '').strip()}"
 
-            if "youtu" in url:
-                ytf = f"b[height<={resolution}][ext=mp4]/bv[height<={resolution}][ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
-            else:
-                ytf = f"b[height<={resolution}]/bv[height<={resolution}]+ba/b/bv+ba"
-
-            if "jw-prod" in url:
-                cmd = f'yt-dlp -o "{name}.mp4" "{url}"'
-            else:
-                cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{name}.mp4"'
-
-            try:
-                if "drive" in url:
-                    await download_file(session, url, f"{name}.pdf")
-                    await bot.send_document(chat_id=m.chat.id, document=f"{name}.pdf", caption=f"**Vid_id  »** {str(index + 1).zfill(3)}\n**Title  »** {link[0]} {resolution} {highlighter}.pdf\n**Batch »** {batch_name}\n\n")
-                elif ".pdf" in url:
-                    await download_file(session, url, f"{name}.pdf")
-                    await bot.send_document(chat_id=m.chat.id, document=f"{name}.pdf", caption=f"**Vid_id  »** {str(index + 1).zfill(3)}\n**Title  »** {link[0]} {highlighter}.pdf\n**Batch »** {batch_name}\n\n")
+                if "youtu" in url:
+                    ytf = f"b[height<={resolution}][ext=mp4]/bv[height<={resolution}][ext=mp4]+ba[ext=m4a]/b[ext=mp4]"
                 else:
-                    show = f"**Downloading:-**\n\n**Name :-** `{name}`\nQuality - {resolution}\n\n**Url :-** `{url}`"
-                    prog = await m.reply_text(show)
-                    res_file = await helper.download_video(url, cmd, name)
-                    await prog.delete(True)
-                    await helper.send_vid(bot, m, f"**Vid_id  »** {str(index + 1).zfill(3)}\n**Title  »** {link[0]} {resolution} {highlighter}.mkv\n**Batch »** {batch_name}\n\n", res_file, thumb_path, name, prog)
-                time.sleep(1)
-            except Exception as e:
-                await m.reply_text(f"**Downloading failed 🥺**\n{str(e)}\n**Name** - {name}\n**Link** - `{url}`")
-                continue
+                    ytf = f"b[height<={resolution}]/bv[height<={resolution}]+ba/b/bv+ba"
 
-    await m.reply_text("Done")
+                if "jw-prod" in url:
+                    cmd = f'yt-dlp -o "{name}.mp4" "{url}"'
+                else:
+                    cmd = f'yt-dlp -f "{ytf}" "{url}" -o "{name}.mp4"'
+
+                try:
+                    if "drive" in url:
+                        await download_file(session, url, f"{name}.pdf")
+                        await bot.send_document(chat_id=m.chat.id, document=f"{name}.pdf", caption=f"**Vid_id  »** {str(index + 1).zfill(3)}\n**Title  »** {link[0]} {resolution} {highlighter}.pdf\n**Batch »** {batch_name}\n\n")
+                    elif ".pdf" in url:
+                        await download_file(session, url, f"{name}.pdf")
+                        await bot.send_document(chat_id=m.chat.id, document=f"{name}.pdf", caption=f"**Vid_id  »** {str(index + 1).zfill(3)}\n**Title  »** {link[0]} {highlighter}.pdf\n**Batch »** {batch_name}\n\n")
+                    else:
+                        show = f"**Downloading:-**\n\n**Name :-** `{name}`\nQuality - {resolution}\n\n**Url :-** `{url}`"
+                        prog = await m.reply_text(show)
+                        res_file = await download_video(url, cmd, name)
+                        await prog.delete(True)
+                        await send_vid(bot, m, f"**Vid_id  »** {str(index + 1).zfill(3)}\n**Title  »** {link[0]} {resolution} {highlighter}.mkv\n**Batch »** {batch_name}\n\n", res_file, thumb_path, name, prog)
+                    time.sleep(1)
+                except Exception as e:
+                    await m.reply_text(f"**Downloading failed 🥺**\n{str(e)}\n**Name** - {name}\n**Link** - `{url}`")
+                    continue
+
+        await m.reply_text("Done")
 
 bot.run()
+
 
 
 
